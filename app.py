@@ -367,7 +367,25 @@ elif page == "🤖 Model Training":
                             st.session_state.df = df
                         
                         st.success(f"✓ {model_name} trained successfully!")
-                        st.metric("Accuracy", f"{metrics['Accuracy']:.4f}")
+                        
+                        # Display all 6 evaluation metrics
+                        st.subheader(f"{model_name} - Performance Metrics")
+                        metric_cols = st.columns(3)
+                        with metric_cols[0]:
+                            st.metric("Accuracy", f"{metrics['Accuracy']:.4f}")
+                        with metric_cols[1]:
+                            st.metric("AUC Score", f"{metrics['AUC']:.4f}")
+                        with metric_cols[2]:
+                            st.metric("Precision", f"{metrics['Precision']:.4f}")
+                        
+                        metric_cols2 = st.columns(3)
+                        with metric_cols2[0]:
+                            st.metric("Recall", f"{metrics['Recall']:.4f}")
+                        with metric_cols2[1]:
+                            st.metric("F1 Score", f"{metrics['F1']:.4f}")
+                        with metric_cols2[2]:
+                            st.metric("MCC Score", f"{metrics['MCC']:.4f}")
+
         
         # Display all trained models results
         if 'individual_metrics' in st.session_state and st.session_state.individual_metrics:
