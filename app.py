@@ -38,6 +38,8 @@ def load_data():
     """Load the breast cancer dataset"""
     try:
         df = pd.read_csv('data/data.csv')
+        # Drop any unnamed columns (index artifacts from CSV export)
+        df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
         return df
     except:
         st.error("Could not load data/data.csv")
