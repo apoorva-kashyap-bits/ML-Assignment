@@ -240,36 +240,48 @@ elif page == "🤖 Model Training":
             X, y, test_size=test_size, random_state=42, stratify=y
         )
         
-        # Train all models
-        st.subheader("Training 6 Classification Models...")
-        progress_bar = st.progress(0)
+        # Train all models button
+        st.subheader("Train Classification Models")
+        st.write("Click the button below to train all 6 models on your selected dataset:")
         
-        results, y_test_actual = train_models(X_train, X_test, y_train, y_test)
+        if st.button("🚀 Train All 6 Models", key="train_models_btn", use_container_width=True):
+            st.subheader("Training 6 Classification Models...")
+            progress_bar = st.progress(0)
+            
+            results, y_test_actual = train_models(X_train, X_test, y_train, y_test)
+            
+            progress_bar.progress(100)
+            st.success("✓ All models trained successfully!")
+            
+            # Calculate metrics for all models
+            all_metrics = {}
+            for model_name, result in results.items():
+                metrics = calculate_metrics(y_test_actual, result['predictions'], result['probabilities'])
+                all_metrics[model_name] = metrics
+            
+            # Create metrics table
+            st.subheader("Evaluation Metrics for All Models")
+            metrics_df = pd.DataFrame(all_metrics).T
+            metrics_df = metrics_df.round(4)
+            st.dataframe(metrics_df, use_container_width=True)
+            
+            # Store in session state for later use
+            st.session_state.results = results
+            st.session_state.y_test = y_test_actual
+            st.session_state.all_metrics = all_metrics
+            st.session_state.X_test = X_test
+            st.session_state.X_train = X_train
+            st.session_state.df = df
+            
+            st.info("✓ Results saved to session. Navigate to 'Model Comparison' for detailed analysis.")
         
-        progress_bar.progress(100)
-        st.success("✓ All models trained successfully!")
-        
-        # Calculate metrics for all models
-        all_metrics = {}
-        for model_name, result in results.items():
-            metrics = calculate_metrics(y_test_actual, result['predictions'], result['probabilities'])
-            all_metrics[model_name] = metrics
-        
-        # Create metrics table
-        st.subheader("Evaluation Metrics for All Models")
-        metrics_df = pd.DataFrame(all_metrics).T
-        metrics_df = metrics_df.round(4)
-        st.dataframe(metrics_df, use_container_width=True)
-        
-        # Store in session state for later use
-        st.session_state.results = results
-        st.session_state.y_test = y_test_actual
-        st.session_state.all_metrics = all_metrics
-        st.session_state.X_test = X_test
-        st.session_state.X_train = X_train
-        st.session_state.df = df
-        
-        st.info("✓ Results saved to session. Navigate to 'Model Comparison' for detailed analysis.")
+        # Display previous results if they exist
+        if 'all_metrics' in st.session_state:
+            st.subheader("Previously Trained Results")
+            st.write("Here are the metrics from your last training session:")
+            metrics_df = pd.DataFrame(st.session_state.all_metrics).T
+            metrics_df = metrics_df.round(4)
+            st.dataframe(metrics_df, use_container_width=True)
 
 # =====================================================
 # PAGE 3: MODEL COMPARISON
