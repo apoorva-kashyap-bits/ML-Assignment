@@ -175,7 +175,9 @@ if page == "📊 Overview":
         with col3:
             st.metric("Target Classes", df['diagnosis'].nunique())
         with col4:
-            st.metric("Missing Values", df.isnull().sum().sum())
+            # Count total missing values across all columns
+            missing_count = df.isnull().sum().sum()
+            st.metric("Missing Values", int(missing_count) if missing_count > 0 else 0)
         
         st.subheader("Dataset Preview")
         st.dataframe(df.head(10), use_container_width=True)
@@ -188,7 +190,7 @@ if page == "📊 Overview":
         with col1:
             st.subheader("Target Variable Distribution")
             target_counts = df['diagnosis'].value_counts()
-            target_labels = {1: 'Malignant', 0: 'Benign'}
+            target_labels = {'M': 'Malignant', 'B': 'Benign'}
             target_counts.index = target_counts.index.map(target_labels)
             fig, ax = plt.subplots(figsize=(6, 4))
             colors = ['#FF6B6B', '#4ECDC4']
@@ -200,9 +202,13 @@ if page == "📊 Overview":
         
         with col2:
             st.subheader("Class Distribution (%)")
-            percentages = df['diagnosis'].value_counts(normalize=True) * 100
-            percentages.index = percentages.index.map(target_labels)
+            # Get value counts and exclude any NaN values
+            target_counts_dist = df['diagnosis'].value_counts(dropna=True)
+            percentages = (target_counts_dist / target_counts_dist.sum()) * 100
+            target_labels_percent = {'M': 'Malignant', 'B': 'Benign'}
+            percentages.index = percentages.index.map(target_labels_percent)
             fig, ax = plt.subplots(figsize=(6, 4))
+            colors = ['#FF6B6B', '#4ECDC4']
             ax.pie(percentages, labels=percentages.index, autopct='%1.1f%%', colors=colors)
             ax.set_ylabel('')
             st.pyplot(fig)
