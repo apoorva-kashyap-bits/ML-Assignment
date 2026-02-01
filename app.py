@@ -386,6 +386,42 @@ elif page == "📈 Model Comparison":
             st.write("### Classification Report")
             report = classification_report(y_test, y_pred, target_names=['No Disease', 'Disease'])
             st.text(report)
+        
+        # New Tab: All Confusion Matrices
+        with st.expander("📊 View All Models' Confusion Matrices"):
+            st.write("### Confusion Matrices for All 6 Models")
+            st.write("Visualize prediction accuracy for each model:")
+            
+            # Create 2x3 grid for all confusion matrices
+            cols = st.columns(3)
+            model_names = list(results.keys())
+            
+            for idx, model_name in enumerate(model_names):
+                with cols[idx % 3]:
+                    y_pred_cm = results[model_name]['predictions']
+                    cm_data = confusion_matrix(y_test, y_pred_cm)
+                    
+                    fig, ax = plt.subplots(figsize=(6, 5))
+                    sns.heatmap(cm_data, annot=True, fmt='d', cmap='RdYlGn', ax=ax, 
+                               cbar=False, annot_kws={'size': 14, 'weight': 'bold'},
+                               xticklabels=['No Disease', 'Disease'],
+                               yticklabels=['No Disease', 'Disease'])
+                    ax.set_xlabel('Predicted', fontweight='bold')
+                    ax.set_ylabel('Actual', fontweight='bold')
+                    ax.set_title(f'{model_name}', fontweight='bold', fontsize=12)
+                    plt.tight_layout()
+                    st.pyplot(fig)
+                    
+                    # Display metrics for this model below its confusion matrix
+                    metrics_data = all_metrics[model_name]
+                    st.markdown(f"""
+                    **Performance Metrics:**
+                    - Accuracy: {metrics_data['Accuracy']:.4f}
+                    - Precision: {metrics_data['Precision']:.4f}
+                    - Recall: {metrics_data['Recall']:.4f}
+                    - F1 Score: {metrics_data['F1']:.4f}
+                    """)
+
 
 # =====================================================
 # PAGE 4: PREDICTIONS
