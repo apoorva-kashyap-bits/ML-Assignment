@@ -1,0 +1,51 @@
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local documentation (keep locally, don't push to git)
+ASSIGNMENT_SUMMARY.txt
+IMPLEMENTATION_GUIDE.txt
+verify_models.py
+
+# Streamlit cache
+.streamlit/
+
+# Models cache
+*.pkl
+models/
