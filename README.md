@@ -1,38 +1,30 @@
-# Heart Disease Classification System
+# Breast Cancer Classification System
 
 ## Problem Statement
-Cardiovascular diseases are a leading cause of mortality worldwide. Early detection of heart disease can significantly improve treatment outcomes and save lives. This project aims to build a machine learning classification system that can predict the presence or absence of heart disease based on clinical and physiological parameters. By comparing multiple classification algorithms, we identify the most effective model for this critical healthcare application.
+Breast cancer is one of the most prevalent cancers affecting women worldwide. Early detection through machine learning classification can assist in identifying malignant tumors and facilitate timely medical intervention. This project implements and compares six machine learning classification algorithms to predict whether a tumor is malignant or benign based on diagnostic measurements of cell nuclei.
 
 ## Dataset Description
-**Dataset Name**: Heart Disease Dataset  
+**Dataset Name**: Breast Cancer Wisconsin (Diagnostic)  
 **Source**: UCI Machine Learning Repository  
-**Format**: CSV with 14 columns  
-**Total Samples**: 270 records  
-**Total Features**: 13 (after removing target)  
-**Target Variable**: Heart Disease (Binary: Presence/Absence)  
+**Format**: CSV with 32 columns  
+**Total Samples**: 569 records  
+**Total Features**: 31 (after removing ID and target)  
+**Target Variable**: Diagnosis (Binary: Malignant/Benign)  
 **Missing Values**: None  
-**Feature Count**: 13 (meets minimum requirement of 12)  
-**Instance Count**: 270+ (meets minimum requirement of 500)
+**Feature Count**: 31 (meets minimum requirement of 12)  
+**Instance Count**: 569 (meets minimum requirement of 500)
 
 ### Features Overview:
-1. **Age**: Age of the patient (years)
-2. **Sex**: Gender (0=Female, 1=Male)
-3. **Chest pain type**: Type of chest pain (1-4)
-4. **BP**: Resting blood pressure (mm Hg)
-5. **Cholesterol**: Serum cholesterol level (mg/dl)
-6. **FBS over 120**: Fasting blood sugar > 120 mg/dl (0/1)
-7. **EKG results**: Resting electrocardiographic results (0-2)
-8. **Max HR**: Maximum heart rate achieved
-9. **Exercise angina**: Angina induced by exercise (0/1)
-10. **ST depression**: ST depression induced by exercise relative to rest
-11. **Slope of ST**: Slope of the ST segment (1-3)
-12. **Number of vessels fluro**: Number of major vessels colored by fluoroscopy (0-3)
-13. **Thallium**: Thallium stress test result (3-7)
+The dataset contains computed features from digitized images of fine needle aspirates of breast mass. All 31 features are numeric measurements including:
+- **Radius, Texture, Perimeter, Area**: Morphological characteristics
+- **Smoothness, Compactness, Concavity**: Shape characteristics
+- **Symmetry, Fractal Dimension**: Structural properties
+- **Three variations**: Mean, Standard Error, and Worst (largest) values
 
 ### Target Variable Distribution:
-- **Absence (No Disease)**: ~140 samples
-- **Presence (Disease)**: ~130 samples
-- **Class Balance**: Relatively balanced dataset
+- **Benign (B)**: ~357 samples (~63%)
+- **Malignant (M)**: ~212 samples (~37%)
+- **Class Balance**: Moderately imbalanced dataset
 
 ---
 

@@ -19,10 +19,10 @@ import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')
 
-st.set_page_config(page_title="Heart Disease Classification", layout="wide")
+st.set_page_config(page_title="Cancer Classification System", layout="wide")
 
 # App title
-st.title("🏥 Heart Disease Classification System")
+st.title("🔬 Breast Cancer Classification System")
 st.markdown("**ML Assignment 2** - Binary Classification with 6 ML Models")
 
 # Sidebar navigation
@@ -35,23 +35,23 @@ page = st.sidebar.radio("Navigation",
 
 @st.cache_data
 def load_data():
-    """Load the heart disease dataset"""
+    """Load the breast cancer dataset"""
     try:
-        df = pd.read_csv('data/heart.csv')
+        df = pd.read_csv('data/data.csv')
         return df
     except:
-        st.error("Could not load data/heart.csv")
+        st.error("Could not load data/data.csv")
         return None
 
 def prepare_data(df):
     """Prepare data for modeling"""
-    # Encode target variable
+    # Encode target variable (M=Malignant=1, B=Benign=0)
     df_processed = df.copy()
-    df_processed['Heart Disease'] = (df_processed['Heart Disease'] == 'Presence').astype(int)
+    df_processed['diagnosis'] = (df_processed['diagnosis'] == 'M').astype(int)
     
-    # Separate features and target
-    X = df_processed.drop('Heart Disease', axis=1)
-    y = df_processed['Heart Disease']
+    # Drop ID column and separate features and target
+    X = df_processed.drop(['id', 'diagnosis'], axis=1)
+    y = df_processed['diagnosis']
     
     return X, y, df_processed
 
@@ -187,18 +187,21 @@ if page == "📊 Overview":
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("Target Variable Distribution")
-            target_counts = df['Heart Disease'].value_counts()
+            target_counts = df['diagnosis'].value_counts()
+            target_labels = {1: 'Malignant', 0: 'Benign'}
+            target_counts.index = target_counts.index.map(target_labels)
             fig, ax = plt.subplots(figsize=(6, 4))
-            colors = ['#4ECDC4', '#FF6B6B']
+            colors = ['#FF6B6B', '#4ECDC4']
             target_counts.plot(kind='bar', ax=ax, color=colors)
-            ax.set_xlabel('Heart Disease Status')
+            ax.set_xlabel('Cancer Diagnosis')
             ax.set_ylabel('Count')
             ax.set_xticklabels(ax.get_xticklabels(), rotation=0)
             st.pyplot(fig)
         
         with col2:
             st.subheader("Class Distribution (%)")
-            percentages = df['Heart Disease'].value_counts(normalize=True) * 100
+            percentages = df['diagnosis'].value_counts(normalize=True) * 100
+            percentages.index = percentages.index.map(target_labels)
             fig, ax = plt.subplots(figsize=(6, 4))
             ax.pie(percentages, labels=percentages.index, autopct='%1.1f%%', colors=colors)
             ax.set_ylabel('')
