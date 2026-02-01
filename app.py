@@ -171,9 +171,9 @@ if page == "📊 Overview":
         with col1:
             st.metric("Total Samples", len(df))
         with col2:
-            st.metric("Total Features", len(df.columns) - 1)
+            st.metric("Total Features", len(df.columns) - 2)  # Exclude ID and diagnosis
         with col3:
-            st.metric("Target Classes", df['Heart Disease'].nunique())
+            st.metric("Target Classes", df['diagnosis'].nunique())
         with col4:
             st.metric("Missing Values", df.isnull().sum().sum())
         
