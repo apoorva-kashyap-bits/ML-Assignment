@@ -240,48 +240,143 @@ elif page == "🤖 Model Training":
             X, y, test_size=test_size, random_state=42, stratify=y
         )
         
-        # Train all models button
+        # Training options
         st.subheader("Train Classification Models")
-        st.write("Click the button below to train all 6 models on your selected dataset:")
+        st.write("Choose to train all models or individual models:")
         
-        if st.button("🚀 Train All 6 Models", key="train_models_btn", use_container_width=True):
-            st.subheader("Training 6 Classification Models...")
-            progress_bar = st.progress(0)
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            st.write("**Batch Training:**")
+            if st.button("🚀 Train All 6 Models", key="train_all_btn", use_container_width=True):
+                st.subheader("Training 6 Classification Models...")
+                progress_bar = st.progress(0)
+                
+                results, y_test_actual = train_models(X_train, X_test, y_train, y_test)
+                
+                progress_bar.progress(100)
+                st.success("✓ All models trained successfully!")
+                
+                # Calculate metrics for all models
+                all_metrics = {}
+                for model_name, result in results.items():
+                    metrics = calculate_metrics(y_test_actual, result['predictions'], result['probabilities'])
+                    all_metrics[model_name] = metrics
+                
+                # Create metrics table
+                st.subheader("Evaluation Metrics for All Models")
+                metrics_df = pd.DataFrame(all_metrics).T
+                metrics_df = metrics_df.round(4)
+                st.dataframe(metrics_df, use_container_width=True)
+                
+                # Store in session state for later use
+                st.session_state.results = results
+                st.session_state.y_test = y_test_actual
+                st.session_state.all_metrics = all_metrics
+                st.session_state.X_test = X_test
+                st.session_state.X_train = X_train
+                st.session_state.df = df
+                
+                st.info("✓ Results saved to session. Navigate to 'Model Comparison' for detailed analysis.")
+        
+        with col2:
+            st.write("**Individual Model Training:**")
+            model_names = ['Logistic Regression', 'Decision Tree', 'K-Nearest Neighbor', 
+                          'Naive Bayes', 'Random Forest', 'XGBoost']
             
-            results, y_test_actual = train_models(X_train, X_test, y_train, y_test)
+            # Create 3 columns x 2 rows for model buttons
+            cols = st.columns(3)
             
-            progress_bar.progress(100)
-            st.success("✓ All models trained successfully!")
-            
-            # Calculate metrics for all models
-            all_metrics = {}
-            for model_name, result in results.items():
-                metrics = calculate_metrics(y_test_actual, result['predictions'], result['probabilities'])
-                all_metrics[model_name] = metrics
-            
-            # Create metrics table
-            st.subheader("Evaluation Metrics for All Models")
-            metrics_df = pd.DataFrame(all_metrics).T
+            for idx, model_name in enumerate(model_names):
+                with cols[idx % 3]:
+                    if st.button(f"📊 {model_name}", key=f"train_{model_name}", use_container_width=True):
+                        st.info(f"Training {model_name}...")
+                        
+                        # Initialize session state for individual models if not exists
+                        if 'individual_results' not in st.session_state:
+                            st.session_state.individual_results = {}
+                            st.session_state.individual_metrics = {}
+                        
+                        # Scale features for models that need it
+                        scaler = StandardScaler()
+                        X_train_scaled = scaler.fit_transform(X_train)
+                        X_test_scaled = scaler.transform(X_test)
+                        
+                        # Train individual model based on selection
+                        if model_name == 'Logistic Regression':
+                            model = LogisticRegression(max_iter=1000, random_state=42)
+                            model.fit(X_train_scaled, y_train)
+                            y_pred = model.predict(X_test_scaled)
+                            y_proba = model.predict_proba(X_test_scaled)[:, 1]
+                            scaler_used = scaler
+                        
+                        elif model_name == 'Decision Tree':
+                            model = DecisionTreeClassifier(random_state=42)
+                            model.fit(X_train, y_train)
+                            y_pred = model.predict(X_test)
+                            y_proba = model.predict_proba(X_test)[:, 1]
+                            scaler_used = None
+                        
+                        elif model_name == 'K-Nearest Neighbor':
+                            model = KNeighborsClassifier(n_neighbors=5)
+                            model.fit(X_train_scaled, y_train)
+                            y_pred = model.predict(X_test_scaled)
+                            y_proba = model.predict_proba(X_test_scaled)[:, 1]
+                            scaler_used = scaler
+                        
+                        elif model_name == 'Naive Bayes':
+                            model = GaussianNB()
+                            model.fit(X_train, y_train)
+                            y_pred = model.predict(X_test)
+                            y_proba = model.predict_proba(X_test)[:, 1]
+                            scaler_used = None
+                        
+                        elif model_name == 'Random Forest':
+                            model = RandomForestClassifier(n_estimators=100, random_state=42)
+                            model.fit(X_train, y_train)
+                            y_pred = model.predict(X_test)
+                            y_proba = model.predict_proba(X_test)[:, 1]
+                            scaler_used = None
+                        
+                        elif model_name == 'XGBoost':
+                            model = XGBClassifier(n_estimators=100, random_state=42, eval_metric='logloss')
+                            model.fit(X_train, y_train)
+                            y_pred = model.predict(X_test)
+                            y_proba = model.predict_proba(X_test)[:, 1]
+                            scaler_used = None
+                        
+                        # Store results
+                        st.session_state.individual_results[model_name] = {
+                            'model': model,
+                            'predictions': y_pred,
+                            'probabilities': y_proba,
+                            'scaler': scaler_used
+                        }
+                        
+                        # Calculate metrics
+                        metrics = calculate_metrics(y_test, y_pred, y_proba)
+                        st.session_state.individual_metrics[model_name] = metrics
+                        
+                        # Store overall session data if not already present
+                        if 'results' not in st.session_state:
+                            st.session_state.results = st.session_state.individual_results
+                            st.session_state.all_metrics = st.session_state.individual_metrics
+                            st.session_state.y_test = y_test
+                            st.session_state.X_test = X_test
+                            st.session_state.X_train = X_train
+                            st.session_state.df = df
+                        
+                        st.success(f"✓ {model_name} trained successfully!")
+                        st.metric("Accuracy", f"{metrics['Accuracy']:.4f}")
+        
+        # Display all trained models results
+        if 'individual_metrics' in st.session_state and st.session_state.individual_metrics:
+            st.subheader("Trained Models Summary")
+            metrics_df = pd.DataFrame(st.session_state.individual_metrics).T
             metrics_df = metrics_df.round(4)
             st.dataframe(metrics_df, use_container_width=True)
             
-            # Store in session state for later use
-            st.session_state.results = results
-            st.session_state.y_test = y_test_actual
-            st.session_state.all_metrics = all_metrics
-            st.session_state.X_test = X_test
-            st.session_state.X_train = X_train
-            st.session_state.df = df
-            
-            st.info("✓ Results saved to session. Navigate to 'Model Comparison' for detailed analysis.")
-        
-        # Display previous results if they exist
-        if 'all_metrics' in st.session_state:
-            st.subheader("Previously Trained Results")
-            st.write("Here are the metrics from your last training session:")
-            metrics_df = pd.DataFrame(st.session_state.all_metrics).T
-            metrics_df = metrics_df.round(4)
-            st.dataframe(metrics_df, use_container_width=True)
+            st.info("✓ Results saved. Navigate to 'Model Comparison' for detailed analysis of trained models.")
 
 # =====================================================
 # PAGE 3: MODEL COMPARISON
