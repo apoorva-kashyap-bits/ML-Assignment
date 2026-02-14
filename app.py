@@ -57,8 +57,87 @@ def prepare_data(df):
     
     return X, y, df_processed
 
+@st.cache_resource
+def load_pretrained_models():
+    """Load all pre-trained models from the model/ folder"""
+    model_dir = 'model'
+    models = {}
+    
+    model_files = {
+        'Logistic Regression': 'logistic_regression.pkl',
+        'Decision Tree': 'decision_tree.pkl',
+        'K-Nearest Neighbor': 'knn.pkl',
+        'Naive Bayes': 'naive_bayes.pkl',
+        'Random Forest': 'random_forest.pkl',
+        'XGBoost': 'xgboost.pkl'
+    }
+    
+    scaler = None
+    scaler_path = os.path.join(model_dir, 'scaler.pkl')
+    
+    try:
+        if os.path.exists(scaler_path):
+            with open(scaler_path, 'rb') as f:
+                scaler = pickle.load(f)
+    except Exception as e:
+        st.warning(f"Could not load scaler: {e}")
+    
+    for model_name, filename in model_files.items():
+        filepath = os.path.join(model_dir, filename)
+        try:
+            if os.path.exists(filepath):
+                with open(filepath, 'rb') as f:
+                    models[model_name] = pickle.load(f)
+            else:
+                st.warning(f"Model file not found: {filepath}")
+        except Exception as e:
+            st.warning(f"Error loading {model_name}: {e}")
+    
+    return models, scaler
+
+def evaluate_pretrained_models(models, scaler, X_test, y_test):
+    """Evaluate all pre-trained models"""
+    results = {}
+    
+    for model_name, model in models.items():
+        try:
+            # Use scaled data for models that need it
+            if model_name in ['Logistic Regression', 'K-Nearest Neighbor']:
+                if scaler is not None:
+                    X_test_scaled = scaler.transform(X_test)
+                    y_pred = model.predict(X_test_scaled)
+                    y_proba = model.predict_proba(X_test_scaled)[:, 1]
+                else:
+                    y_pred = model.predict(X_test)
+                    y_proba = model.predict_proba(X_test)[:, 1]
+            else:
+                y_pred = model.predict(X_test)
+                y_proba = model.predict_proba(X_test)[:, 1]
+            
+            results[model_name] = {
+                'model': model,
+                'predictions': y_pred,
+                'probabilities': y_proba
+            }
+        except Exception as e:
+            st.error(f"Error evaluating {model_name}: {e}")
+    
+    return results
+
+def calculate_metrics(y_true, y_pred, y_proba):
+    """Calculate all required metrics"""
+    metrics = {
+        'Accuracy': accuracy_score(y_true, y_pred),
+        'AUC': roc_auc_score(y_true, y_proba),
+        'Precision': precision_score(y_true, y_pred),
+        'Recall': recall_score(y_true, y_pred),
+        'F1': f1_score(y_true, y_pred),
+        'MCC': matthews_corrcoef(y_true, y_pred)
+    }
+    return metrics
+
 def train_models(X_train, X_test, y_train, y_test):
-    """Train all 6 models and return results"""
+    """Train all 6 models and return results (for comparison/testing)"""
     
     results = {}
     
@@ -147,18 +226,6 @@ def train_models(X_train, X_test, y_train, y_test):
     
     return results, y_test
 
-def calculate_metrics(y_true, y_pred, y_proba):
-    """Calculate all required metrics"""
-    metrics = {
-        'Accuracy': accuracy_score(y_true, y_pred),
-        'AUC': roc_auc_score(y_true, y_proba),
-        'Precision': precision_score(y_true, y_pred),
-        'Recall': recall_score(y_true, y_pred),
-        'F1': f1_score(y_true, y_pred),
-        'MCC': matthews_corrcoef(y_true, y_pred)
-    }
-    return metrics
-
 # =====================================================
 # PAGE 1: OVERVIEW
 # =====================================================
@@ -241,244 +308,166 @@ elif page == "🤖 Model Training":
         )
         
         # Training options
-        st.subheader("Train Classification Models")
-        st.write("Choose to train all models or individual models:")
+        st.subheader("Load Pre-trained Models")
+        st.write("The models have been pre-trained and saved. Click below to load and evaluate them:")
         
-        col1, col2 = st.columns([1, 2])
-        
-        with col1:
-            st.write("**Batch Training:**")
-            if st.button("🚀 Train All 6 Models", key="train_all_btn", use_container_width=True):
-                st.subheader("Training 6 Classification Models...")
-                progress_bar = st.progress(0)
-                
-                results, y_test_actual = train_models(X_train, X_test, y_train, y_test)
-                
-                progress_bar.progress(100)
-                st.success("✓ All models trained successfully!")
-                
-                # Calculate metrics for all models
-                all_metrics = {}
-                for model_name, result in results.items():
-                    metrics = calculate_metrics(y_test_actual, result['predictions'], result['probabilities'])
-                    all_metrics[model_name] = metrics
-                
-                # Create metrics table
-                st.subheader("Evaluation Metrics for All Models")
-                metrics_df = pd.DataFrame(all_metrics).T
-                metrics_df = metrics_df.round(4)
-                st.dataframe(metrics_df, use_container_width=True)
-                
-                # Store in session state for later use
-                st.session_state.results = results
-                st.session_state.y_test = y_test_actual
-                st.session_state.all_metrics = all_metrics
-                st.session_state.X_test = X_test
-                st.session_state.X_train = X_train
-                st.session_state.df = df
-                
-                st.info("✓ Results saved to session. Navigate to 'Model Comparison' for detailed analysis.")
-        
-        with col2:
-            st.write("**Individual Model Training:**")
-            model_names = ['Logistic Regression', 'Decision Tree', 'K-Nearest Neighbor', 
-                          'Naive Bayes', 'Random Forest', 'XGBoost']
+        if st.button("📥 Load Pre-trained Models & Evaluate", use_container_width=True):
+            st.subheader("Loading Pre-trained Models...")
             
-            # Create 3 columns x 2 rows for model buttons
-            cols = st.columns(3)
-            
-            for idx, model_name in enumerate(model_names):
-                with cols[idx % 3]:
-                    if st.button(f"📊 {model_name}", key=f"train_{model_name}", use_container_width=True):
-                        st.info(f"Training {model_name}...")
-                        
-                        # Initialize session state for individual models if not exists
-                        if 'individual_results' not in st.session_state:
-                            st.session_state.individual_results = {}
-                            st.session_state.individual_metrics = {}
-                        
-                        # Scale features for models that need it
-                        scaler = StandardScaler()
-                        X_train_scaled = scaler.fit_transform(X_train)
-                        X_test_scaled = scaler.transform(X_test)
-                        
-                        # Train individual model based on selection
-                        if model_name == 'Logistic Regression':
-                            model = LogisticRegression(max_iter=1000, random_state=42)
-                            model.fit(X_train_scaled, y_train)
-                            y_pred = model.predict(X_test_scaled)
-                            y_proba = model.predict_proba(X_test_scaled)[:, 1]
-                            scaler_used = scaler
-                        
-                        elif model_name == 'Decision Tree':
-                            model = DecisionTreeClassifier(random_state=42)
-                            model.fit(X_train, y_train)
-                            y_pred = model.predict(X_test)
-                            y_proba = model.predict_proba(X_test)[:, 1]
-                            scaler_used = None
-                        
-                        elif model_name == 'K-Nearest Neighbor':
-                            model = KNeighborsClassifier(n_neighbors=5)
-                            model.fit(X_train_scaled, y_train)
-                            y_pred = model.predict(X_test_scaled)
-                            y_proba = model.predict_proba(X_test_scaled)[:, 1]
-                            scaler_used = scaler
-                        
-                        elif model_name == 'Naive Bayes':
-                            model = GaussianNB()
-                            model.fit(X_train, y_train)
-                            y_pred = model.predict(X_test)
-                            y_proba = model.predict_proba(X_test)[:, 1]
-                            scaler_used = None
-                        
-                        elif model_name == 'Random Forest':
-                            model = RandomForestClassifier(n_estimators=100, random_state=42)
-                            model.fit(X_train, y_train)
-                            y_pred = model.predict(X_test)
-                            y_proba = model.predict_proba(X_test)[:, 1]
-                            scaler_used = None
-                        
-                        elif model_name == 'XGBoost':
-                            model = XGBClassifier(n_estimators=100, random_state=42, eval_metric='logloss')
-                            model.fit(X_train, y_train)
-                            y_pred = model.predict(X_test)
-                            y_proba = model.predict_proba(X_test)[:, 1]
-                            scaler_used = None
-                        
-                        # Store results
-                        st.session_state.individual_results[model_name] = {
-                            'model': model,
-                            'predictions': y_pred,
-                            'probabilities': y_proba,
-                            'scaler': scaler_used
-                        }
-                        
-                        # Calculate metrics
-                        metrics = calculate_metrics(y_test, y_pred, y_proba)
-                        st.session_state.individual_metrics[model_name] = metrics
-                        
-                        # Store overall session data if not already present
-                        if 'results' not in st.session_state:
-                            st.session_state.results = st.session_state.individual_results
-                            st.session_state.all_metrics = st.session_state.individual_metrics
-                            st.session_state.y_test = y_test
-                            st.session_state.X_test = X_test
-                            st.session_state.X_train = X_train
-                            st.session_state.df = df
-                        
-                        st.success(f"✓ {model_name} trained successfully!")
-                        
-                        # Display all 6 evaluation metrics
-                        st.subheader(f"{model_name} - Performance Metrics")
-                        metric_cols = st.columns(3)
-                        with metric_cols[0]:
-                            st.metric("Accuracy", f"{metrics['Accuracy']:.4f}")
-                        with metric_cols[1]:
-                            st.metric("AUC Score", f"{metrics['AUC']:.4f}")
-                        with metric_cols[2]:
-                            st.metric("Precision", f"{metrics['Precision']:.4f}")
-                        
-                        metric_cols2 = st.columns(3)
-                        with metric_cols2[0]:
-                            st.metric("Recall", f"{metrics['Recall']:.4f}")
-                        with metric_cols2[1]:
-                            st.metric("F1 Score", f"{metrics['F1']:.4f}")
-                        with metric_cols2[2]:
-                            st.metric("MCC Score", f"{metrics['MCC']:.4f}")
-
+            try:
+                # Load pre-trained models
+                pretrained_models, scaler = load_pretrained_models()
+                
+                if not pretrained_models:
+                    st.error("No pre-trained models found in model/ folder. Please run: python model/train.py")
+                else:
+                    st.success(f"✓ Loaded {len(pretrained_models)} pre-trained models!")
+                    
+                    # Evaluate all pre-trained models
+                    results = evaluate_pretrained_models(pretrained_models, scaler, X_test, y_test)
+                    
+                    # Calculate metrics for all models
+                    all_metrics = {}
+                    for model_name, result in results.items():
+                        metrics = calculate_metrics(y_test, result['predictions'], result['probabilities'])
+                        all_metrics[model_name] = metrics
+                    
+                    # Create metrics table
+                    st.subheader("Evaluation Metrics for All Pre-trained Models")
+                    metrics_df = pd.DataFrame(all_metrics).T
+                    metrics_df = metrics_df.round(4)
+                    st.dataframe(metrics_df, use_container_width=True)
+                    
+                    # Store in session state for later use
+                    st.session_state.results = results
+                    st.session_state.y_test = y_test
+                    st.session_state.all_metrics = all_metrics
+                    st.session_state.X_test = X_test
+                    st.session_state.X_train = X_train
+                    st.session_state.df = df
+                    
+                    st.info("✓ Results loaded to session. Navigate to 'Model Comparison' for detailed analysis.")
+                    
+                    # Display all trained models results
+                    st.subheader("Pre-trained Models Summary")
+                    metrics_df = pd.DataFrame(all_metrics).T
+                    metrics_df = metrics_df.round(4)
+                    st.dataframe(metrics_df, use_container_width=True)
+                    
+            except Exception as e:
+                st.error(f"Error loading models: {e}")
         
-        # Display all trained models results
-        if 'individual_metrics' in st.session_state and st.session_state.individual_metrics:
-            st.subheader("Trained Models Summary")
-            metrics_df = pd.DataFrame(st.session_state.individual_metrics).T
+        st.divider()
+        st.subheader("Train New Models (Optional)")
+        st.write("You can also train models from scratch for comparison:")
+        
+        if st.button("🚀 Train New Models from Scratch", use_container_width=True):
+            st.subheader("Training 6 Classification Models...")
+            progress_bar = st.progress(0)
+            
+            results, y_test_actual = train_models(X_train, X_test, y_train, y_test)
+            
+            progress_bar.progress(100)
+            st.success("✓ All models trained successfully!")
+            
+            # Calculate metrics for all models
+            all_metrics = {}
+            for model_name, result in results.items():
+                metrics = calculate_metrics(y_test_actual, result['predictions'], result['probabilities'])
+                all_metrics[model_name] = metrics
+            
+            # Create metrics table
+            st.subheader("Evaluation Metrics for Newly Trained Models")
+            metrics_df = pd.DataFrame(all_metrics).T
             metrics_df = metrics_df.round(4)
             st.dataframe(metrics_df, use_container_width=True)
             
-            st.info("✓ Results saved. Navigate to 'Model Comparison' for detailed analysis of trained models.")
+            # Store in session state for later use
+            st.session_state.results = results
+            st.session_state.y_test = y_test_actual
+            st.session_state.all_metrics = all_metrics
+            st.session_state.X_test = X_test
+            st.session_state.X_train = X_train
+            st.session_state.df = df
+            
+            st.info("✓ Results saved to session. Navigate to 'Model Comparison' for detailed analysis.")
 
 # =====================================================
 # PAGE 3: MODEL COMPARISON
 # =====================================================
 
 elif page == "📈 Model Comparison":
-    st.header("Model Performance Comparison")
+    st.header("Model Comparison & Analysis")
     
     if 'all_metrics' not in st.session_state:
-        st.warning("⚠️ Please train the models first on the 'Model Training' page!")
+        st.warning("No models loaded. Please go to 'Model Training' page and load pre-trained models first.")
     else:
-        all_metrics = st.session_state.all_metrics
-        results = st.session_state.results
-        y_test = st.session_state.y_test
-        
-        # Display metrics table
-        st.subheader("Metrics Comparison Table")
-        metrics_df = pd.DataFrame(all_metrics).T
+        # Display all models metrics
+        st.subheader("Performance Metrics Comparison")
+        metrics_df = pd.DataFrame(st.session_state.all_metrics).T
         metrics_df = metrics_df.round(4)
         st.dataframe(metrics_df, use_container_width=True)
         
-        # Visualization
+        # Metrics visualization
         st.subheader("Metrics Visualization")
         
-        metrics_list = ['Accuracy', 'AUC', 'Precision', 'Recall', 'F1', 'MCC']
+        # Create comparison charts
+        col1, col2 = st.columns(2)
         
-        # Create tabs for different metrics
-        tab1, tab2, tab3 = st.tabs(["Individual Metrics", "Comparison Chart", "Detailed Analysis"])
-        
-        with tab1:
-            selected_metric = st.selectbox("Select Metric", metrics_list)
-            fig, ax = plt.subplots(figsize=(12, 6))
-            
-            models = list(all_metrics.keys())
-            values = [all_metrics[model][selected_metric] for model in models]
-            
-            colors = plt.cm.Set3(range(len(models)))
-            bars = ax.bar(models, values, color=colors, edgecolor='black', linewidth=1.5)
-            ax.set_ylabel(selected_metric, fontsize=12)
-            ax.set_ylim(0, 1)
-            ax.set_xticklabels(models, rotation=45, ha='right')
-            ax.grid(axis='y', alpha=0.3)
-            
-            # Add value labels
-            for bar, val in zip(bars, values):
-                ax.text(bar.get_x() + bar.get_width()/2., bar.get_height(),
-                       f'{val:.3f}', ha='center', va='bottom', fontweight='bold')
-            
-            plt.tight_layout()
+        with col1:
+            st.write("**Accuracy Comparison**")
+            fig, ax = plt.subplots(figsize=(8, 5))
+            metrics_df['Accuracy'].sort_values(ascending=True).plot(kind='barh', ax=ax, color='steelblue')
+            ax.set_xlabel('Accuracy Score')
+            ax.set_title('Model Accuracy Comparison')
             st.pyplot(fig)
         
-        with tab2:
-            fig, axes = plt.subplots(2, 3, figsize=(16, 10))
-            axes = axes.ravel()
-            
-            models = list(all_metrics.keys())
-            colors = plt.cm.Set3(range(len(models)))
-            
-            for idx, metric in enumerate(metrics_list):
-                ax = axes[idx]
-                values = [all_metrics[model][metric] for model in models]
-                
-                bars = ax.bar(models, values, color=colors, edgecolor='black', linewidth=1.5)
-                ax.set_ylabel(metric, fontsize=11)
-                ax.set_ylim(0, 1)
-                ax.set_xticklabels(models, rotation=45, ha='right', fontsize=9)
-                ax.grid(axis='y', alpha=0.3)
-                
-                for bar, val in zip(bars, values):
-                    ax.text(bar.get_x() + bar.get_width()/2., bar.get_height(),
-                           f'{val:.2f}', ha='center', va='bottom', fontsize=8, fontweight='bold')
-            
-            plt.tight_layout()
+        with col2:
+            st.write("**AUC Score Comparison**")
+            fig, ax = plt.subplots(figsize=(8, 5))
+            metrics_df['AUC'].sort_values(ascending=True).plot(kind='barh', ax=ax, color='orange')
+            ax.set_xlabel('AUC Score')
+            ax.set_title('Model AUC Comparison')
             st.pyplot(fig)
         
-        with tab3:
-            st.write("### Detailed Performance Analysis")
-            st.write("Select a model to view its detailed metrics and confusion matrix:")
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            st.write("**F1 Score Comparison**")
+            fig, ax = plt.subplots(figsize=(8, 5))
+            metrics_df['F1'].sort_values(ascending=True).plot(kind='barh', ax=ax, color='green')
+            ax.set_xlabel('F1 Score')
+            ax.set_title('Model F1 Score Comparison')
+            st.pyplot(fig)
+        
+        with col4:
+            st.write("**Precision vs Recall**")
+            fig, ax = plt.subplots(figsize=(8, 5))
+            x = np.arange(len(metrics_df))
+            width = 0.35
+            ax.bar(x - width/2, metrics_df['Precision'], width, label='Precision', color='coral')
+            ax.bar(x + width/2, metrics_df['Recall'], width, label='Recall', color='lightblue')
+            ax.set_xlabel('Models')
+            ax.set_ylabel('Score')
+            ax.set_title('Precision vs Recall')
+            ax.set_xticks(x)
+            ax.set_xticklabels(metrics_df.index, rotation=45, ha='right')
+            ax.legend()
+            st.pyplot(fig)
+        
+        # Detailed model analysis
+        st.subheader("Detailed Model Analysis")
+        
+        selected_model = st.selectbox("Select a model for detailed analysis:", metrics_df.index)
+        
+        if selected_model and 'results' in st.session_state:
+            st.write(f"**{selected_model} - Detailed Report**")
             
-            selected_model = st.selectbox("Select Model", list(all_metrics.keys()))
+            result = st.session_state.results[selected_model]
+            metrics = st.session_state.all_metrics[selected_model]
             
+            # Display metrics
             col1, col2, col3 = st.columns(3)
-            
-            metrics = all_metrics[selected_model]
             with col1:
                 st.metric("Accuracy", f"{metrics['Accuracy']:.4f}")
             with col2:
@@ -486,207 +475,106 @@ elif page == "📈 Model Comparison":
             with col3:
                 st.metric("F1 Score", f"{metrics['F1']:.4f}")
             
-            col1, col2, col3 = st.columns(3)
-            with col1:
+            col4, col5, col6 = st.columns(3)
+            with col4:
                 st.metric("Precision", f"{metrics['Precision']:.4f}")
-            with col2:
+            with col5:
                 st.metric("Recall", f"{metrics['Recall']:.4f}")
-            with col3:
-                st.metric("MCC Score", f"{metrics['MCC']:.4f}")
+            with col6:
+                st.metric("MCC", f"{metrics['MCC']:.4f}")
             
             # Confusion Matrix
-            y_pred = results[selected_model]['predictions']
-            cm = confusion_matrix(y_test, y_pred)
-            
-            fig, ax = plt.subplots(figsize=(8, 6))
-            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax, cbar=False,
-                       xticklabels=['No Disease', 'Disease'],
-                       yticklabels=['No Disease', 'Disease'])
+            st.write("**Confusion Matrix**")
+            cm = confusion_matrix(st.session_state.y_test, result['predictions'])
+            fig, ax = plt.subplots(figsize=(6, 5))
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
             ax.set_xlabel('Predicted')
             ax.set_ylabel('Actual')
-            ax.set_title(f'{selected_model} - Confusion Matrix')
             st.pyplot(fig)
-            
-            # Classification Report
-            st.write("### Classification Report")
-            report = classification_report(y_test, y_pred, target_names=['No Disease', 'Disease'])
-            st.text(report)
-        
-        # New Tab: All Confusion Matrices
-        with st.expander("📊 View All Models' Confusion Matrices"):
-            st.write("### Confusion Matrices for All 6 Models")
-            st.write("Visualize prediction accuracy for each model:")
-            
-            # Create 2x3 grid for all confusion matrices
-            cols = st.columns(3)
-            model_names = list(results.keys())
-            
-            for idx, model_name in enumerate(model_names):
-                with cols[idx % 3]:
-                    y_pred_cm = results[model_name]['predictions']
-                    cm_data = confusion_matrix(y_test, y_pred_cm)
-                    
-                    fig, ax = plt.subplots(figsize=(6, 5))
-                    sns.heatmap(cm_data, annot=True, fmt='d', cmap='RdYlGn', ax=ax, 
-                               cbar=False, annot_kws={'size': 14, 'weight': 'bold'},
-                               xticklabels=['No Disease', 'Disease'],
-                               yticklabels=['No Disease', 'Disease'])
-                    ax.set_xlabel('Predicted', fontweight='bold')
-                    ax.set_ylabel('Actual', fontweight='bold')
-                    ax.set_title(f'{model_name}', fontweight='bold', fontsize=12)
-                    plt.tight_layout()
-                    st.pyplot(fig)
-                    
-                    # Display metrics for this model below its confusion matrix
-                    metrics_data = all_metrics[model_name]
-                    st.markdown(f"""
-                    **Performance Metrics:**
-                    - Accuracy: {metrics_data['Accuracy']:.4f}
-                    - Precision: {metrics_data['Precision']:.4f}
-                    - Recall: {metrics_data['Recall']:.4f}
-                    - F1 Score: {metrics_data['F1']:.4f}
-                    """)
-
 
 # =====================================================
 # PAGE 4: PREDICTIONS
 # =====================================================
 
 elif page == "🔮 Predictions":
-    st.header("Make Predictions on New Data")
+    st.header("Make Predictions")
     
-    df = load_data()
-    
-    if df is not None:
-        if 'all_metrics' not in st.session_state:
-            st.warning("⚠️ Please train the models first on the 'Model Training' page!")
-        else:
-            results = st.session_state.results
+    if 'all_metrics' not in st.session_state:
+        st.warning("No models loaded. Please go to 'Model Training' page and load pre-trained models first.")
+    else:
+        df = load_data()
+        X, y, _ = prepare_data(df)
+        
+        st.write("Enter feature values to make predictions:")
+        
+        # Create input fields for all features
+        input_values = {}
+        cols = st.columns(4)
+        
+        for idx, col_name in enumerate(X.columns):
+            col = cols[idx % 4]
+            with col:
+                input_values[col_name] = st.number_input(
+                    f"{col_name}",
+                    value=float(X[col_name].mean()),
+                    min_value=float(X[col_name].min()),
+                    max_value=float(X[col_name].max()),
+                    step=0.1
+                )
+        
+        if st.button("🔮 Predict", use_container_width=True):
+            # Prepare input data
+            input_df = pd.DataFrame([input_values])
             
-            # Option 1: Single prediction
-            st.subheader("Option 1: Single Patient Prediction")
+            # Load scaler
+            models, scaler = load_pretrained_models()
             
-            # Model selector
-            st.write("**Select Model for Prediction:**")
-            selected_pred_model = st.selectbox(
-                "Choose a classification model",
-                list(results.keys()),
-                key="pred_model_select"
-            )
+            st.subheader("Prediction Results")
             
-            # Get feature ranges from training data
-            X_train = st.session_state.X_train
-            feature_ranges = {}
-            for col in X_train.columns:
-                feature_ranges[col] = (X_train[col].min(), X_train[col].max())
+            # Make predictions with all models
+            predictions = {}
             
-            # Create input form
-            st.write("Enter patient clinical data:")
+            for model_name, model in st.session_state.results.items():
+                try:
+                    # Use scaled data for models that need it
+                    if model_name in ['Logistic Regression', 'K-Nearest Neighbor']:
+                        if scaler is not None:
+                            input_scaled = scaler.transform(input_df)
+                            pred = model['model'].predict(input_scaled)[0]
+                            proba = model['model'].predict_proba(input_scaled)[0]
+                        else:
+                            pred = model['model'].predict(input_df)[0]
+                            proba = model['model'].predict_proba(input_df)[0]
+                    else:
+                        pred = model['model'].predict(input_df)[0]
+                        proba = model['model'].predict_proba(input_df)[0]
+                    
+                    predictions[model_name] = {
+                        'prediction': 'Malignant' if pred == 1 else 'Benign',
+                        'confidence': max(proba) * 100
+                    }
+                except Exception as e:
+                    st.error(f"Error predicting with {model_name}: {e}")
             
-            cols = st.columns(3)
-            user_input = {}
+            # Display predictions
+            cols = st.columns(2)
             
-            for idx, feature in enumerate(X_train.columns):
-                with cols[idx % 3]:
-                    min_val, max_val = feature_ranges[feature]
-                    user_input[feature] = st.number_input(
-                        feature,
-                        min_value=float(min_val),
-                        max_value=float(max_val),
-                        value=float((min_val + max_val) / 2),
-                        step=1.0
+            for idx, (model_name, pred_data) in enumerate(predictions.items()):
+                with cols[idx % 2]:
+                    color = "🔴" if pred_data['prediction'] == 'Malignant' else "🟢"
+                    st.info(
+                        f"{color} **{model_name}**\n\n"
+                        f"Prediction: **{pred_data['prediction']}**\n\n"
+                        f"Confidence: **{pred_data['confidence']:.2f}%**"
                     )
             
-            if st.button("🔍 Predict", key="predict_btn"):
-                # Create prediction dataframe
-                user_df = pd.DataFrame([user_input])
-                
-                # Get selected model result
-                result = results[selected_pred_model]
-                if result['scaler'] is not None:
-                    user_df_scaled = result['scaler'].transform(user_df)
-                else:
-                    user_df_scaled = user_df
-                
-                pred = result['model'].predict(user_df_scaled)[0]
-                proba = result['model'].predict_proba(user_df_scaled)[0]
-                
-                # Display results for selected model
-                st.subheader(f"Prediction Results - {selected_pred_model}")
-                
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    prediction_text = "🔴 Disease Present" if pred == 1 else "🟢 No Disease"
-                    if pred == 1:
-                        st.error(prediction_text)
-                    else:
-                        st.success(prediction_text)
-                
-                with col2:
-                    st.metric("Confidence (No Disease)", f"{proba[0]:.2%}")
-                
-                with col3:
-                    st.metric("Confidence (Disease)", f"{proba[1]:.2%}")
-                
-                # Display confidence chart
-                fig, ax = plt.subplots(figsize=(8, 4))
-                classes = ['No Disease', 'Disease']
-                confidences = [proba[0], proba[1]]
-                colors = ['green', 'red']
-                ax.barh(classes, confidences, color=colors, alpha=0.7)
-                ax.set_xlabel('Confidence Score')
-                ax.set_title(f'{selected_pred_model} - Prediction Confidence')
-                ax.set_xlim(0, 1)
-                for i, v in enumerate(confidences):
-                    ax.text(v + 0.02, i, f'{v:.2%}', va='center')
-                st.pyplot(fig)
+            # Consensus prediction
+            malignant_count = sum(1 for p in predictions.values() if p['prediction'] == 'Malignant')
+            consensus = 'Malignant' if malignant_count > len(predictions) / 2 else 'Benign'
+            consensus_color = "🔴" if consensus == 'Malignant' else "🟢"
             
-            # Option 2: Upload CSV for batch predictions
-            st.subheader("Option 2: Batch Predictions from CSV")
-            
-            # Model selector for batch predictions
-            st.write("**Select Model for Batch Prediction:**")
-            selected_batch_model = st.selectbox(
-                "Choose a classification model",
-                list(results.keys()),
-                key="batch_model_select"
+            st.divider()
+            st.success(
+                f"{consensus_color} **CONSENSUS PREDICTION: {consensus}**\n\n"
+                f"{malignant_count}/{len(predictions)} models predict Malignant"
             )
-            
-            uploaded_file = st.file_uploader("Upload CSV file for predictions", type=['csv'])
-            
-            if uploaded_file is not None:
-                test_data = pd.read_csv(uploaded_file)
-                
-                st.write(f"Uploaded {len(test_data)} samples")
-                
-                if st.button("🔍 Predict All"):
-                    st.subheader(f"Batch Prediction Results - {selected_batch_model}")
-                    
-                    # Get selected model for batch prediction
-                    result = results[selected_batch_model]
-                    if result['scaler'] is not None:
-                        test_data_scaled = result['scaler'].transform(test_data)
-                    else:
-                        test_data_scaled = test_data
-                    
-                    preds = result['model'].predict(test_data_scaled)
-                    proba = result['model'].predict_proba(test_data_scaled)
-                    
-                    # Create results dataframe
-                    results_df = test_data.copy()
-                    results_df[f'{selected_batch_model}_Prediction'] = preds
-                    results_df[f'{selected_batch_model}_Prediction'] = results_df[f'{selected_batch_model}_Prediction'].map({0: 'No Disease', 1: 'Disease'})
-                    results_df[f'{selected_batch_model}_Confidence_Disease'] = proba[:, 1]
-                    results_df[f'{selected_batch_model}_Confidence_No_Disease'] = proba[:, 0]
-                    
-                    st.dataframe(results_df, use_container_width=True)
-                    
-                    # Download results
-                    csv = results_df.to_csv(index=False)
-                    st.download_button(
-                        label="Download Results",
-                        data=csv,
-                        file_name="predictions.csv",
-                        mime="text/csv"
-                    )

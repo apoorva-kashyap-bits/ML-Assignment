@@ -38,14 +38,17 @@ wheels/
 .DS_Store
 Thumbs.db
 
+# Data files (keep locally for training, don't push to git)
+data/
+*.csv
+
 # Local documentation (keep locally, don't push to git)
 ASSIGNMENT_SUMMARY.txt
 IMPLEMENTATION_GUIDE.txt
+CODE_REVIEW.md
+VERIFICATION_REPORT.md
 verify_models.py
+ML_Assignment_2.pdf
 
 # Streamlit cache
 .streamlit/
-
-# Models cache
-*.pkl
-models/
