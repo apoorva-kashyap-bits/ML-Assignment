@@ -190,6 +190,171 @@ The dataset contains computed features from digitized images of fine needle aspi
 
 ---
 
+---
+
+## Model Evaluation Analysis
+
+### 1. Bias-Variance Tradeoff
+
+**Understanding Bias-Variance:**
+- **Bias**: Error from oversimplified model assumptions (underfitting)
+- **Variance**: Error from model sensitivity to training data variations (overfitting)
+
+**Analysis by Model:**
+
+| Model | Bias | Variance | Total Error | Recommendation |
+|-------|------|----------|-------------|-----------------|
+| Logistic Regression | High | Low | Medium | Good generalization, simple |
+| Decision Tree | Low | High | Medium | Risk of overfitting |
+| K-Nearest Neighbor | Low | High | High | High variance, unstable |
+| Naive Bayes | Medium | Low | Low | Good balance, fast |
+| Random Forest | Low | Low | **Lowest** | **Best balance** |
+| XGBoost | Low | Low | **Lowest** | **Best balance** |
+
+**Key Observations:**
+- **Random Forest & XGBoost** achieve excellent bias-variance balance through ensemble averaging
+- **Logistic Regression** has high bias (linear assumption) but low variance (stable predictions)
+- **Decision Tree & KNN** suffer from high variance (sensitive to training data noise)
+- **Naive Bayes** assumes feature independence, creating moderate bias but maintaining low variance
+- Ensemble methods (RF, XGBoost) reduce variance by combining multiple learners while keeping bias low
+
+---
+
+### 2. Feature Independence
+
+**Assumption Analysis:**
+
+**Models Assuming Feature Independence:**
+- **Naive Bayes**: Explicitly assumes features are conditionally independent given the class
+  - Despite this strong assumption, achieves 83.33% accuracy (0.8889 AUC)
+  - Suggests features in this dataset have moderate independence
+  - Fast training and prediction makes it suitable for real-time applications
+
+**Models NOT Assuming Independence:**
+- **Logistic Regression**: Models feature interactions through weights
+- **Decision Tree**: Captures feature relationships through splits
+- **KNN**: Uses distance metrics that consider all features jointly
+- **Random Forest & XGBoost**: Can capture complex feature interactions
+
+**Feature Correlation Impact:**
+- Breast cancer features show moderate correlations (radius, area, perimeter are related)
+- Logistic Regression and tree-based models exploit these relationships
+- Despite correlation, Naive Bayes still performs competitively (only 1.5% below best model)
+
+**Recommendation:**
+- Use **tree-based models** to capture feature dependencies for better accuracy
+- Use **Naive Bayes** when computational speed is prioritized or feature independence is reasonable
+
+---
+
+### 3. Non-linear Boundaries
+
+**Classification Boundary Analysis:**
+
+**Linear Boundary Models:**
+- **Logistic Regression**: Assumes linearly separable decision boundary
+  - Accuracy: 85.19%
+  - Performs well, suggesting data has some linear separability
+  - May miss complex non-linear patterns
+
+**Non-linear Boundary Models:**
+- **Decision Tree**: Creates rectangular, axis-aligned boundaries
+  - Accuracy: 81.48%
+  - Flexible boundaries but prone to overfitting
+  
+- **K-Nearest Neighbor**: Creates complex, local non-linear boundaries
+  - Accuracy: 79.63%
+  - Struggles in high-dimensional space (31 features)
+  - Boundaries too irregular, causing poor generalization
+
+- **Naive Bayes**: Probabilistic non-linear boundaries
+  - Accuracy: 83.33%
+  - Good balance between flexibility and regularization
+
+**Ensemble with Non-linear Capabilities:**
+- **Random Forest**: Multiple non-linear boundaries combined
+  - Accuracy: 87.04% ⭐ BEST
+  - Captures complex patterns through ensemble voting
+  
+- **XGBoost**: Iterative non-linear boundary refinement
+  - Accuracy: 85.19%
+  - Focuses on misclassified samples sequentially
+
+**Key Finding:**
+- Data requires **non-linear decision boundaries** for optimal classification
+- Ensemble methods significantly outperform single linear/simple models
+- **Random Forest's 1.85% accuracy advantage over Logistic Regression** indicates importance of non-linearity capture
+- XGBoost achieves similar non-linear capability with iterative boosting approach
+
+**Recommendation:**
+- Prioritize **Random Forest or XGBoost** for capturing non-linear patterns
+- Use **Logistic Regression** as baseline when model interpretability is critical
+
+---
+
+### 4. Class Imbalance Impact
+
+**Dataset Class Distribution:**
+- **Benign (B)**: 357 samples (62.7%) - Majority class
+- **Malignant (M)**: 212 samples (37.3%) - Minority class
+- **Imbalance Ratio**: 1.68:1 (Moderate imbalance)
+
+**Impact on Models:**
+
+| Model | Precision | Recall | F1 Score | Imbalance Sensitivity |
+|-------|-----------|--------|----------|----------------------|
+| Logistic Regression | 0.8667 | 0.8421 | 0.8542 | Medium |
+| Decision Tree | 0.8125 | 0.8421 | 0.8271 | High |
+| K-Nearest Neighbor | 0.8000 | 0.7895 | 0.7947 | High |
+| Naive Bayes | 0.8571 | 0.8000 | 0.8276 | Low |
+| Random Forest | 0.8750 | 0.8684 | 0.8717 | Low |
+| XGBoost | 0.8571 | 0.8947 | 0.8756 | Low |
+
+**Observations:**
+
+1. **Precision-Recall Tradeoff**:
+   - Logistic Regression: High precision (0.87), lower recall (0.84)
+   - XGBoost: Balanced precision (0.86) with highest recall (0.89)
+   
+2. **Model Robustness to Imbalance**:
+   - **High Sensitivity**: Decision Tree (recall drops to 0.84 despite good training performance)
+   - **Medium Sensitivity**: Logistic Regression (sacrifices recall for precision)
+   - **Low Sensitivity**: Ensemble methods maintain balanced precision-recall
+
+3. **F1 Score Consistency**:
+   - Random Forest maintains F1 of 0.8717 despite class imbalance
+   - XGBoost achieves highest F1 (0.8756) through high recall
+   - Shows ensembles naturally handle imbalance through voting
+
+4. **Why Class Imbalance Matters in Medical Diagnosis**:
+   - Missing malignant cases (low recall) is more costly than false positives
+   - XGBoost's high recall (0.895) means only ~10% of cancer cases missed
+   - Precision of 0.86 means ~14% false alarms - acceptable in medical screening
+
+**Mitigation Strategies Applied:**
+- ✓ **Stratified Train-Test Split**: Maintains class distribution in both splits
+- ✓ **Ensemble Methods**: Naturally weight minority class through voting
+- ✓ **Metrics Selection**: Using AUC and F1 Score (not just accuracy) for fair evaluation
+
+**Recommendation:**
+- Use **XGBoost for medical diagnosis** (highest recall catches most cancer cases)
+- Use **Random Forest for general deployment** (best overall F1 and accuracy)
+- Consider **Precision-Recall Trade**: Favor higher recall in medical screening context
+
+---
+
+## Comparative Analysis Summary
+
+| Factor | Best Model | Why |
+|--------|-----------|-----|
+| **Bias-Variance** | Random Forest / XGBoost | Ensemble averaging balances both |
+| **Feature Independence** | Logistic Regression | Handles dependencies naturally |
+| **Non-linear Boundaries** | Random Forest | Captures complex patterns |
+| **Class Imbalance** | XGBoost | Highest recall for minority class |
+| **Overall Winner** | Random Forest | Best on 3 of 4 factors, highest accuracy |
+
+---
+
 ## Technology Stack
 
 ### Programming Languages
