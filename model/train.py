@@ -93,6 +93,11 @@ for idx, (model_name, model) in enumerate(models.items(), 1):
     except Exception as e:
         print(f"✗ ERROR: {str(e)}")
 
+# Save feature column order
+feature_columns_path = os.path.join(MODEL_DIR, 'feature_columns.pkl')
+with open(feature_columns_path, 'wb') as f:
+    pickle.dump(X.columns.tolist(), f)
+print(f"  ✓ Feature columns saved to: feature_columns.pkl") 
 print("\n" + "="*70)
 print("✓ ALL MODELS TRAINED AND SAVED SUCCESSFULLY!")
 print("="*70)
