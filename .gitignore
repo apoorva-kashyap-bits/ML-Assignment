@@ -41,6 +41,7 @@ Thumbs.db
 # Data files (keep locally for training, don't push to git)
 data/
 *.csv
+!test.csv
 
 # Local documentation (keep locally, don't push to git)
 ASSIGNMENT_SUMMARY.txt
